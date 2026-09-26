@@ -13,12 +13,15 @@ setuptools<70.0.0
 supabase
 bcrypt
 
-
+# AWS RDS PostgreSQL
+psycopg2-binary
 
 segno
 pillow
 
-
+# AWS SDK
+boto3
+botocore
 
 librosa
 resemblyzer

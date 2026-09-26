@@ -1,0 +1,67 @@
+version: 0.2
+
+env:
+  variables:
+    PYTHON_VERSION: "3.9"
+  parameter-store:
+    DB_HOST: /snapclass/prod/db/host
+    DB_PORT: /snapclass/prod/db/port
+    DB_NAME: /snapclass/prod/db/name
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.9
+    commands:
+      - echo "Installing dependencies..."
+      - pip install --upgrade pip
+      - pip install -r requirements.txt
+      - pip install pytest pytest-cov flake8 black mypy
+
+  pre_build:
+    commands:
+      - echo "Running code quality checks..."
+      - black --check src/ app.py || true
+      - flake8 src/ app.py --max-line-length=120 --exclude=venv || true
+      - echo "Running tests..."
+      - pytest tests/ -v --cov=src --cov-report=xml --cov-report=html || true
+      - echo "Test coverage report generated"
+
+  build:
+    commands:
+      - echo "Build started on `date`"
+      - echo "Creating deployment package..."
+      - mkdir -p build
+      - cp -r src build/
+      - cp app.py build/
+      - cp requirements.txt build/
+      - cp -r .streamlit build/ 2>/dev/null || mkdir -p build/.streamlit
+      - echo "Build completed on `date`"
+
+  post_build:
+    commands:
+      - echo "Creating deployment archive..."
+      - cd build
+      - zip -r ../deployment.zip . -x "*.git*" "*.pyc" "__pycache__/*" "tests/*"
+      - cd ..
+      - echo "Deployment package created"
+      - ls -lh deployment.zip
+
+artifacts:
+  files:
+    - deployment.zip
+    - appspec.yml
+    - scripts/**/*
+  name: SnapClassBuild-$(date +%Y%m%d-%H%M%S)
+
+reports:
+  coverage:
+    files:
+      - coverage.xml
+    file-format: COBERTURAXML
+
+cache:
+  paths:
+    - '/root/.cache/pip/**/*'
+
+# Made with Bob

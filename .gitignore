@@ -38,3 +38,24 @@ dist/
 
 # Supabase
 supabase/.temp/
+
+# AWS Deployment
+deployment.zip
+*.pem
+*.key
+
+# Environment files
+.env
+.env.production
+.env.staging
+
+# Coverage reports
+htmlcov/
+.coverage
+coverage.xml
+*.cover
+
+# AWS credentials (should never be committed)
+.aws/
+credentials
+config

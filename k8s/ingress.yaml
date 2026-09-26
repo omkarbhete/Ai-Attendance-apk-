@@ -1,0 +1,58 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: snapclass-ingress
+  namespace: snapclass
+  annotations:
+    # AWS Load Balancer Controller annotations
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    
+    # SSL Certificate
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:<REGION>:<AWS_ACCOUNT_ID>:certificate/<CERTIFICATE_ID>
+    
+    # Health check
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz
+    alb.ingress.kubernetes.io/healthcheck-port: '8502'
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: '30'
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '10'
+    alb.ingress.kubernetes.io/healthy-threshold-count: '2'
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: '3'
+    
+    # Load balancer attributes
+    alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=60
+    alb.ingress.kubernetes.io/target-group-attributes: stickiness.enabled=true,stickiness.lb_cookie.duration_seconds=86400
+    
+    # WAF
+    alb.ingress.kubernetes.io/wafv2-acl-arn: arn:aws:wafv2:<REGION>:<AWS_ACCOUNT_ID>:regional/webacl/<WAF_NAME>/<WAF_ID>
+    
+    # Tags
+    alb.ingress.kubernetes.io/tags: Environment=production,Application=snapclass
+spec:
+  rules:
+  - host: yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: snapclass-internal
+            port:
+              number: 8501
+  - host: www.yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: snapclass-internal
+            port:
+              number: 8501
+
+# Made with Bob

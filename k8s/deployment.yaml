@@ -1,0 +1,199 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: snapclass-app
+  namespace: snapclass
+  labels:
+    app: snapclass
+    component: application
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: snapclass
+      component: application
+  template:
+    metadata:
+      labels:
+        app: snapclass
+        component: application
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8502"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: snapclass-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      
+      containers:
+      - name: snapclass
+        image: <AWS_ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/snapclass:latest
+        imagePullPolicy: Always
+        
+        ports:
+        - name: http
+          containerPort: 8501
+          protocol: TCP
+        - name: health
+          containerPort: 8502
+          protocol: TCP
+        
+        env:
+        # ConfigMap values
+        - name: APP_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: snapclass-config
+              key: APP_ENV
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: snapclass-config
+              key: LOG_LEVEL
+        - name: STREAMLIT_SERVER_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: snapclass-config
+              key: STREAMLIT_SERVER_PORT
+        - name: STREAMLIT_SERVER_ADDRESS
+          valueFrom:
+            configMapKeyRef:
+              name: snapclass-config
+              key: STREAMLIT_SERVER_ADDRESS
+        - name: DB_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: snapclass-config
+              key: DB_PORT
+        - name: DB_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: snapclass-config
+              key: DB_NAME
+        - name: REDIS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: snapclass-config
+              key: REDIS_PORT
+        
+        # Secret values
+        - name: DB_HOST
+          valueFrom:
+            secretKeyRef:
+              name: snapclass-secrets
+              key: DB_HOST
+        - name: DB_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: snapclass-secrets
+              key: DB_USERNAME
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: snapclass-secrets
+              key: DB_PASSWORD
+        - name: REDIS_ENDPOINT
+          valueFrom:
+            secretKeyRef:
+              name: snapclass-secrets
+              key: REDIS_ENDPOINT
+        - name: REDIS_AUTH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: snapclass-secrets
+              key: REDIS_AUTH_TOKEN
+        - name: S3_BUCKET
+          valueFrom:
+            secretKeyRef:
+              name: snapclass-secrets
+              key: S3_BUCKET
+        - name: AWS_REGION
+          valueFrom:
+            secretKeyRef:
+              name: snapclass-secrets
+              key: AWS_REGION
+        - name: APP_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: snapclass-secrets
+              key: APP_SECRET_KEY
+        
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: health
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: health
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        startupProbe:
+          httpGet:
+            path: /healthz
+            port: health
+          initialDelaySeconds: 0
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+        
+        volumeMounts:
+        - name: app-logs
+          mountPath: /var/log/snapclass
+        - name: tmp
+          mountPath: /tmp
+      
+      volumes:
+      - name: app-logs
+        emptyDir: {}
+      - name: tmp
+        emptyDir: {}
+      
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - snapclass
+              topologyKey: kubernetes.io/hostname
+      
+      tolerations:
+      - key: "node.kubernetes.io/not-ready"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 300
+      - key: "node.kubernetes.io/unreachable"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 300
+
+# Made with Bob
